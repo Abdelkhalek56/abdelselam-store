@@ -1142,19 +1142,48 @@ function storageWarningHtml(){
   return '';
 }
 
+let alertsVisibleCount = 4;
+const ALERTS_PAGE_SIZE = 4;
+
 function renderAlerts(){
   const alerts = computeAlerts();
   const area = document.getElementById('alertsArea');
   let html = storageWarningHtml();
-  html += alerts.map(r=>{
+
+  const visible = alerts.slice(0, alertsVisibleCount);
+  html += visible.map(r=>{
     const out = (r.qty||0) <= 0;
     return `<div class="alert-item ${out?'out':'low'}">
       <span>${out ? '🔴 نفذ من المستودع' : '🟡 كمية منخفضة'} — ${r.pname} (${r.vname}) — المتبقي: ${r.qty||0}</span>
       <button onclick="hideAlert('${r.id}')" title="إخفاء">✕</button>
     </div>`;
   }).join('');
+
+  if(alerts.length > alertsVisibleCount){
+    const remaining = alerts.length - alertsVisibleCount;
+    html += `<button class="btn btn-ghost btn-sm" style="align-self:flex-start;" onclick="showMoreAlerts()">
+      إظهار المزيد (${remaining} أخرى) ▾
+    </button>`;
+  } else if(alertsVisibleCount > ALERTS_PAGE_SIZE && alerts.length > ALERTS_PAGE_SIZE){
+    html += `<button class="btn btn-ghost btn-sm" style="align-self:flex-start;" onclick="collapseAlerts()">
+      إظهار أقل ▴
+    </button>`;
+  }
+
   area.innerHTML = html;
 }
+
+function showMoreAlerts(){
+  alertsVisibleCount += ALERTS_PAGE_SIZE;
+  renderAlerts();
+}
+window.showMoreAlerts = showMoreAlerts;
+
+function collapseAlerts(){
+  alertsVisibleCount = ALERTS_PAGE_SIZE;
+  renderAlerts();
+}
+window.collapseAlerts = collapseAlerts;
 
 function totalInventoryValue(){
   return records.reduce((sum,r)=> sum + (r.price||0) * (r.qty||0), 0);
