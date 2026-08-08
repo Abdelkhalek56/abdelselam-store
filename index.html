@@ -142,6 +142,12 @@
   }
   .empty b{color:var(--accent);}
 
+  .pagination{
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    margin-top:24px;flex-wrap:wrap;
+  }
+  .page-indicator{font-size:13px;color:var(--dim);}
+
   .card{
     background:var(--card);border:1px solid var(--border);
     border-radius:18px;padding:16px;position:relative;
@@ -1189,6 +1195,9 @@ function totalInventoryValue(){
   return records.reduce((sum,r)=> sum + (r.price||0) * (r.qty||0), 0);
 }
 
+let currentPage = 1;
+const PAGE_SIZE = 10;
+
 function render(){
   updateFilterOptions();
   renderAlerts();
@@ -1222,7 +1231,12 @@ function render(){
     return;
   }
 
-  gridArea.innerHTML = `<div class="grid">` + filtered.map(r=>{
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if(currentPage > totalPages) currentPage = totalPages;
+  if(currentPage < 1) currentPage = 1;
+  const pageItems = filtered.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
+
+  gridArea.innerHTML = `<div class="grid">` + pageItems.map(r=>{
     const qty = r.qty||0;
     const threshold = r.lowStockThreshold ?? 3;
     const isOut = qty <= 0;
@@ -1266,12 +1280,31 @@ function render(){
       </div>
     </div>`;
   }).join('') + `</div>`;
+
+  gridArea.innerHTML += `
+    <div class="pagination">
+      <button class="btn btn-ghost btn-sm" onclick="goToPage(${currentPage-1})" ${currentPage<=1?'disabled':''}>‹ السابق</button>
+      <span class="page-indicator">صفحة ${currentPage} من ${totalPages} (${filtered.length} قطعة)</span>
+      <button class="btn btn-ghost btn-sm" onclick="goToPage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>التالي ›</button>
+    </div>`;
 }
 
-searchInput.addEventListener('input', render);
-filterType.addEventListener('change', render);
-filterCategory.addEventListener('change', render);
-sortSelect.addEventListener('change', render);
+function goToPage(p){
+  currentPage = p;
+  render();
+  gridArea.scrollIntoView({behavior:'smooth', block:'start'});
+}
+window.goToPage = goToPage;
+
+function renderResetPage(){
+  currentPage = 1;
+  render();
+}
+
+searchInput.addEventListener('input', renderResetPage);
+filterType.addEventListener('change', renderResetPage);
+filterCategory.addEventListener('change', renderResetPage);
+sortSelect.addEventListener('change', renderResetPage);
 
 initSupabaseSync();
 loadRecords();
