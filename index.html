@@ -775,6 +775,12 @@ async function loadRecords(){
   }catch(e){ records = []; }
   render();
 }
+function chunkArray(arr, size){
+  const out = [];
+  for(let i=0; i<arr.length; i+=size) out.push(arr.slice(i, i+size));
+  return out;
+}
+
 async function saveRecords(){
   migrateRecords();
   if(SUPABASE_ENABLED && supabaseClient){
@@ -785,13 +791,21 @@ async function saveRecords(){
       const currentIds = new Set(records.map(r=>r.id));
       const toDelete = [...existingIds].filter(id=>!currentIds.has(id));
       if(toDelete.length){
-        const { error: delErr } = await supabaseClient.from('records').delete().in('id', toDelete);
-        if(delErr) throw delErr;
+        for(const batch of chunkArray(toDelete, 200)){
+          const { error: delErr } = await supabaseClient.from('records').delete().in('id', batch);
+          if(delErr) throw delErr;
+        }
       }
       if(records.length){
         const rows = records.map(r=>({ id: r.id, data: r }));
-        const { error: upErr } = await supabaseClient.from('records').upsert(rows);
-        if(upErr) throw upErr;
+        const batches = chunkArray(rows, 150);
+        let done = 0;
+        for(const batch of batches){
+          const { error: upErr } = await supabaseClient.from('records').upsert(batch);
+          if(upErr) throw upErr;
+          done += batch.length;
+          if(batches.length > 1) toast(`جارٍ الحفظ... ${done}/${rows.length}`);
+        }
       }
     }catch(e){ toast('تعذّر الحفظ في القاعدة، تحقق من الاتصال'); }
     return;
@@ -924,13 +938,17 @@ async function saveSales(){
       const currentIds = new Set(sales.map(s=>s.id));
       const toDelete = [...existingIds].filter(id=>!currentIds.has(id));
       if(toDelete.length){
-        const { error: delErr } = await supabaseClient.from('sales').delete().in('id', toDelete);
-        if(delErr) throw delErr;
+        for(const batch of chunkArray(toDelete, 200)){
+          const { error: delErr } = await supabaseClient.from('sales').delete().in('id', batch);
+          if(delErr) throw delErr;
+        }
       }
       if(sales.length){
         const rows = sales.map(s=>({ id: s.id, data: s }));
-        const { error: upErr } = await supabaseClient.from('sales').upsert(rows);
-        if(upErr) throw upErr;
+        for(const batch of chunkArray(rows, 150)){
+          const { error: upErr } = await supabaseClient.from('sales').upsert(batch);
+          if(upErr) throw upErr;
+        }
       }
     }catch(e){ toast('تعذّر الحفظ في القاعدة'); }
     return;
